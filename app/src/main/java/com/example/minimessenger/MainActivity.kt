@@ -20,6 +20,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.Button
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -28,15 +29,24 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import java.io.InputStream
+import android.webkit.WebResourceError
+import android.view.View
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var lockOverlay: FrameLayout
+    private lateinit var errorView: View
+    private lateinit var bottomNav: BottomNavigationView
+
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
     private var isLocked = false
+
+    // Desktop User Agent
+    private val DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -74,9 +84,13 @@ class MainActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
         swipeRefresh = findViewById(R.id.swipe_refresh)
         lockOverlay = findViewById(R.id.lock_overlay)
+        errorView = findViewById(R.id.error_view)
+        bottomNav = findViewById(R.id.bottom_navigation)
 
         setupWebView()
         setupSwipeRefresh()
+        setupBottomNav()
+        setupErrorView()
 
         handleIntent(intent)
     }
@@ -85,9 +99,26 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIntent(intent)
+
+        // Handle Share Intent
+        if (Intent.ACTION_SEND == intent?.action) {
+             handleShareIntent(intent)
+        }
+    }
+
+    private fun handleShareIntent(intent: Intent) {
+        // Just open the app for now as discussed
+        Toast.makeText(this, "Select a conversation to share", Toast.LENGTH_LONG).show()
+        // Ensure we are on the messages screen
+        webView.loadUrl("https://m.facebook.com/messages/")
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (Intent.ACTION_SEND == intent?.action) {
+            handleShareIntent(intent)
+            return
+        }
+
         val url = intent?.dataString
         if (url != null && (url.contains("facebook.com") || url.contains("messenger.com"))) {
             webView.loadUrl(url)
@@ -160,19 +191,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_settings) {
-            startActivity(Intent(this, SettingsActivity::class.java))
-            return true
-        }
-        return super.onOptionsItemSelected(item)
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         val settings: WebSettings = webView.settings
@@ -238,7 +256,18 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 swipeRefresh.isRefreshing = false
+                errorView.visibility = View.GONE
+                webView.visibility = View.VISIBLE
                 injectCustomScript()
+            }
+
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                // Only show error for main frame
+                if (request?.isForMainFrame == true) {
+                    webView.visibility = View.GONE
+                    errorView.visibility = View.VISIBLE
+                    swipeRefresh.isRefreshing = false
+                }
             }
         }
 
@@ -288,9 +317,53 @@ class MainActivity : AppCompatActivity() {
             val darkMode = prefs.getBoolean("dark_mode", true)
             val hideClutter = prefs.getBoolean("hide_clutter", true)
 
+            // Apply Desktop Mode and Zoom
+            val desktopMode = prefs.getBoolean("desktop_mode", false)
+            val textZoom = prefs.getInt("text_zoom", 100)
+
+            if (desktopMode) {
+                webView.settings.userAgentString = DESKTOP_USER_AGENT
+                // Desktop mode usually needs wide view port
+                webView.settings.useWideViewPort = true
+                webView.settings.loadWithOverviewMode = true
+            } else {
+                webView.settings.userAgentString = USER_AGENT
+                webView.settings.useWideViewPort = false
+                webView.settings.loadWithOverviewMode = false
+            }
+            webView.settings.textZoom = textZoom
+
             // 3. Configure the script
             val configJs = "window.applyMiniMessengerConfig({ darkMode: $darkMode, hideClutter: $hideClutter });"
             webView.evaluateJavascript(configJs, null)
+        }
+    }
+
+    private fun setupBottomNav() {
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_chats -> {
+                    webView.loadUrl("https://m.facebook.com/messages/")
+                    true
+                }
+                R.id.nav_people -> {
+                    webView.loadUrl("https://m.facebook.com/messages/active_status/")
+                    true
+                }
+                R.id.nav_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    false // Don't select, just launch activity
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun setupErrorView() {
+        errorView.findViewById<Button>(R.id.btn_retry).setOnClickListener {
+            errorView.visibility = View.GONE
+            webView.visibility = View.VISIBLE
+            webView.reload()
         }
     }
 

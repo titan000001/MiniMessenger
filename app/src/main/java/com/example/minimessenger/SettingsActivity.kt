@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
+import com.google.android.material.slider.Slider
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 class SettingsActivity : AppCompatActivity() {
@@ -21,11 +22,15 @@ class SettingsActivity : AppCompatActivity() {
         val switchDarkMode = findViewById<SwitchMaterial>(R.id.switch_dark_mode)
         val switchHideClutter = findViewById<SwitchMaterial>(R.id.switch_hide_clutter)
         val switchAppLock = findViewById<SwitchMaterial>(R.id.switch_app_lock)
+        val switchDesktopMode = findViewById<SwitchMaterial>(R.id.switch_desktop_mode)
+        val sliderTextZoom = findViewById<Slider>(R.id.slider_text_zoom)
 
         // Set initial state
         switchDarkMode.isChecked = prefs.getBoolean("dark_mode", true)
         switchHideClutter.isChecked = prefs.getBoolean("hide_clutter", true)
         switchAppLock.isChecked = prefs.getBoolean("app_lock", false)
+        switchDesktopMode.isChecked = prefs.getBoolean("desktop_mode", false)
+        sliderTextZoom.value = prefs.getInt("text_zoom", 100).toFloat()
 
         // Listeners
         switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
@@ -34,6 +39,14 @@ class SettingsActivity : AppCompatActivity() {
 
         switchHideClutter.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("hide_clutter", isChecked).apply()
+        }
+
+        switchDesktopMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("desktop_mode", isChecked).apply()
+        }
+
+        sliderTextZoom.addOnChangeListener { _, value, _ ->
+            prefs.edit().putInt("text_zoom", value.toInt()).apply()
         }
 
         switchAppLock.setOnCheckedChangeListener { buttonView, isChecked ->
