@@ -65,26 +65,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun injectCustomScript() {
+    // Cache the script content to avoid reading from disk on every page load
+    private val cachedInjectorScript: String? by lazy {
         try {
-            val inputStream: InputStream = assets.open("js/injector.js")
-            val buffer = ByteArray(inputStream.available())
-            inputStream.read(buffer)
-            inputStream.close()
-            val encoded = android.util.Base64.encodeToString(buffer, android.util.Base64.NO_WRAP)
-            
-            webView.evaluateJavascript(
+            assets.open("js/injector.js").use { inputStream ->
+                val buffer = inputStream.readBytes()
+                val encoded = android.util.Base64.encodeToString(buffer, android.util.Base64.NO_WRAP)
                 "(function() { " +
                         "var parent = document.getElementsByTagName('head').item(0);" +
                         "var script = document.createElement('script');" +
                         "script.type = 'text/javascript';" +
                         "script.innerHTML = window.atob('$encoded');" +
                         "parent.appendChild(script)" +
-                        "})()",
-                null
-            )
+                        "})()"
+            }
         } catch (e: Exception) {
             e.printStackTrace()
+            null
+        }
+    }
+
+    private fun injectCustomScript() {
+        cachedInjectorScript?.let { script ->
+            webView.evaluateJavascript(script, null)
         }
     }
 
