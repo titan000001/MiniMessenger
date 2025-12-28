@@ -2,18 +2,26 @@ package com.example.minimessenger
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
+import android.view.Menu
+import android.view.MenuItem
 import android.webkit.CookieManager
+import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import java.io.InputStream
 
 class MainActivity : AppCompatActivity() {
@@ -51,12 +59,34 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
         webView = findViewById(R.id.webview)
 
         setupWebView()
 
         // Load Messenger
         webView.loadUrl("https://m.facebook.com/messages/")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-inject script to apply any changed settings
+        injectCustomScript()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == R.id.action_settings) {
+            startActivity(Intent(this, SettingsActivity::class.java))
+            return true
+        }
+        return super.onOptionsItemSelected(item)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -126,6 +156,21 @@ class MainActivity : AppCompatActivity() {
                 injectCustomScript()
             }
         }
+
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimetype, contentLength ->
+            val request = DownloadManager.Request(Uri.parse(url))
+            request.setMimeType(mimetype)
+            request.addRequestHeader("Cookie", CookieManager.getInstance().getCookie(url))
+            request.addRequestHeader("User-Agent", userAgent)
+            request.setDescription("Downloading file...")
+            request.setTitle(URLUtil.guessFileName(url, contentDisposition, mimetype))
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, URLUtil.guessFileName(url, contentDisposition, mimetype))
+
+            val dm = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            Toast.makeText(applicationContext, "Downloading File...", Toast.LENGTH_LONG).show()
+        }
     }
 
     // Cache the script content to avoid reading from disk on every page load
@@ -150,7 +195,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun injectCustomScript() {
         cachedInjectorScript?.let { script ->
+            // 1. Inject the script definitions (only happens once really, but safe to repeat)
             webView.evaluateJavascript(script, null)
+
+            // 2. Read preferences
+            val prefs = getSharedPreferences("MiniMessengerPrefs", Context.MODE_PRIVATE)
+            val darkMode = prefs.getBoolean("dark_mode", true)
+            val hideClutter = prefs.getBoolean("hide_clutter", true)
+
+            // 3. Configure the script
+            val configJs = "window.applyMiniMessengerConfig({ darkMode: $darkMode, hideClutter: $hideClutter });"
+            webView.evaluateJavascript(configJs, null)
         }
     }
 
