@@ -23,6 +23,7 @@ class SettingsActivity : AppCompatActivity() {
         val switchHideClutter = findViewById<SwitchMaterial>(R.id.switch_hide_clutter)
         val switchAppLock = findViewById<SwitchMaterial>(R.id.switch_app_lock)
         val switchDesktopMode = findViewById<SwitchMaterial>(R.id.switch_desktop_mode)
+        val switchDataSaver = findViewById<SwitchMaterial>(R.id.switch_data_saver)
         val sliderTextZoom = findViewById<Slider>(R.id.slider_text_zoom)
 
         // Set initial state
@@ -30,6 +31,7 @@ class SettingsActivity : AppCompatActivity() {
         switchHideClutter.isChecked = prefs.getBoolean("hide_clutter", true)
         switchAppLock.isChecked = prefs.getBoolean("app_lock", false)
         switchDesktopMode.isChecked = prefs.getBoolean("desktop_mode", false)
+        switchDataSaver.isChecked = prefs.getBoolean("data_saver", false)
         sliderTextZoom.value = prefs.getInt("text_zoom", 100).toFloat()
 
         // Listeners
@@ -43,6 +45,10 @@ class SettingsActivity : AppCompatActivity() {
 
         switchDesktopMode.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("desktop_mode", isChecked).apply()
+        }
+
+        switchDataSaver.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("data_saver", isChecked).apply()
         }
 
         sliderTextZoom.addOnChangeListener { _, value, _ ->
