@@ -1,0 +1,14 @@
+# Gradle files
+.gradle/
+build/
+app/build/
+
+# Local configuration file (sdk.dir is not checked in)
+local.properties
+
+# Android Studio generated files
+.idea/
+.DS_Store
+*.iml
+.navigation/
+captures/
