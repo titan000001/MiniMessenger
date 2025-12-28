@@ -2,7 +2,9 @@ package com.example.minimessenger
 
 import android.content.Context
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
 import com.google.android.material.switchmaterial.SwitchMaterial
 
 class SettingsActivity : AppCompatActivity() {
@@ -18,10 +20,12 @@ class SettingsActivity : AppCompatActivity() {
 
         val switchDarkMode = findViewById<SwitchMaterial>(R.id.switch_dark_mode)
         val switchHideClutter = findViewById<SwitchMaterial>(R.id.switch_hide_clutter)
+        val switchAppLock = findViewById<SwitchMaterial>(R.id.switch_app_lock)
 
         // Set initial state
         switchDarkMode.isChecked = prefs.getBoolean("dark_mode", true)
         switchHideClutter.isChecked = prefs.getBoolean("hide_clutter", true)
+        switchAppLock.isChecked = prefs.getBoolean("app_lock", false)
 
         // Listeners
         switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
@@ -30,6 +34,24 @@ class SettingsActivity : AppCompatActivity() {
 
         switchHideClutter.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("hide_clutter", isChecked).apply()
+        }
+
+        switchAppLock.setOnCheckedChangeListener { buttonView, isChecked ->
+            if (isChecked) {
+                // Verify biometrics are actually available before enabling
+                val biometricManager = BiometricManager.from(this)
+                val canAuthenticate = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+
+                if (canAuthenticate == BiometricManager.BIOMETRIC_SUCCESS) {
+                    prefs.edit().putBoolean("app_lock", true).apply()
+                } else {
+                    // Revert switch and show error
+                    buttonView.isChecked = false
+                    Toast.makeText(this, "Biometric authentication is not available on this device.", Toast.LENGTH_LONG).show()
+                }
+            } else {
+                prefs.edit().putBoolean("app_lock", false).apply()
+            }
         }
     }
 

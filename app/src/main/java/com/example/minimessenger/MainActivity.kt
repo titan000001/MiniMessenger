@@ -18,16 +18,25 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.View
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import java.io.InputStream
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var lockOverlay: FrameLayout
     private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+    private var isLocked = false
 
     private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -63,17 +72,92 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
 
         webView = findViewById(R.id.webview)
+        swipeRefresh = findViewById(R.id.swipe_refresh)
+        lockOverlay = findViewById(R.id.lock_overlay)
 
         setupWebView()
+        setupSwipeRefresh()
 
-        // Load Messenger
-        webView.loadUrl("https://m.facebook.com/messages/")
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val url = intent?.dataString
+        if (url != null && (url.contains("facebook.com") || url.contains("messenger.com"))) {
+            webView.loadUrl(url)
+        } else if (webView.url == null) {
+             // Only load default if WebView is empty (first launch)
+            webView.loadUrl("https://m.facebook.com/messages/")
+        }
     }
 
     override fun onResume() {
         super.onResume()
         // Re-inject script to apply any changed settings
         injectCustomScript()
+        checkAppLock()
+    }
+
+    private fun checkAppLock() {
+        val prefs = getSharedPreferences("MiniMessengerPrefs", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("app_lock", false)) {
+             // Only lock if not already authenticated or if we consider moving away as re-lock
+             // For simplicity, we lock on every Resume if enabled.
+             if (!isLocked) {
+                 lockApp()
+             }
+        } else {
+            lockOverlay.visibility = View.GONE
+        }
+    }
+
+    private fun lockApp() {
+        isLocked = true
+        lockOverlay.visibility = View.VISIBLE
+
+        val executor = ContextCompat.getMainExecutor(this)
+        val biometricPrompt = BiometricPrompt(this, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    isLocked = false
+                    lockOverlay.visibility = View.GONE
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    // If user cancels, we must finish the activity to prevent bypass.
+                    // For other errors (HW failure), we also finish to fail safe.
+                    Toast.makeText(applicationContext, "Authentication failed: $errString", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            })
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock MiniMessenger")
+            .setSubtitle("Confirm your identity to continue")
+            .setNegativeButtonText("Cancel")
+            .build()
+
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    private fun setupSwipeRefresh() {
+        swipeRefresh.setOnRefreshListener {
+            webView.reload()
+        }
+
+        // Only enable swipe to refresh when at the top of the scroll
+        // This is a simple implementation; complex web pages might require better scroll detection
+        webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            swipeRefresh.isEnabled = scrollY == 0
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -153,6 +237,7 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                swipeRefresh.isRefreshing = false
                 injectCustomScript()
             }
         }

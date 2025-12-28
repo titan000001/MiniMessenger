@@ -24,4 +24,14 @@
         app:layout_constraintTop_toBottomOf="@id/switch_dark_mode"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_app_lock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/app_lock"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/switch_hide_clutter"
+        app:layout_constraintStart_toStartOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
