@@ -1,19 +1,47 @@
 package com.example.minimessenger
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import java.io.InputStream
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    private var fileUploadCallback: ValueCallback<Array<Uri>>? = null
+
+    private val fileChooserLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            var results: Array<Uri>? = null
+
+            if (data?.data != null) {
+                // Single file
+                results = arrayOf(data.data!!)
+            } else if (data?.clipData != null) {
+                // Multiple files
+                val count = data.clipData!!.itemCount
+                results = Array(count) { i -> data.clipData!!.getItemAt(i).uri }
+            }
+
+            fileUploadCallback?.onReceiveValue(results)
+        } else {
+            // Cancelled
+            fileUploadCallback?.onReceiveValue(null)
+        }
+        fileUploadCallback = null
+    }
 
     // Mobile User Agent to ensure we get the mobile site
     private val USER_AGENT = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
@@ -46,7 +74,42 @@ class MainActivity : AppCompatActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
-        webView.webChromeClient = WebChromeClient()
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                // Cancel existing callback if any
+                fileUploadCallback?.onReceiveValue(null)
+                fileUploadCallback = filePathCallback
+
+                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                }
+
+                // Allow user to choose file type based on accept types if provided
+                if (fileChooserParams != null && fileChooserParams.acceptTypes.isNotEmpty()) {
+                    // Simple check, in a real app we might map mime types more robustly
+                     if (fileChooserParams.acceptTypes.any { it.contains("image") }) {
+                         intent.type = "image/*"
+                         intent.putExtra(Intent.EXTRA_MIME_TYPES, fileChooserParams.acceptTypes)
+                     }
+                }
+
+                try {
+                    fileChooserLauncher.launch(Intent.createChooser(intent, "Choose File"))
+                    return true
+                } catch (e: Exception) {
+                    fileUploadCallback?.onReceiveValue(null)
+                    fileUploadCallback = null
+                    return false
+                }
+            }
+        }
+
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString()
