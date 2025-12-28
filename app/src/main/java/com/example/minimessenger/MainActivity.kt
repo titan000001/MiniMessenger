@@ -320,6 +320,7 @@ class MainActivity : AppCompatActivity() {
             // Apply Desktop Mode and Zoom
             val desktopMode = prefs.getBoolean("desktop_mode", false)
             val textZoom = prefs.getInt("text_zoom", 100)
+            val dataSaver = prefs.getBoolean("data_saver", false)
 
             if (desktopMode) {
                 webView.settings.userAgentString = DESKTOP_USER_AGENT
@@ -332,6 +333,17 @@ class MainActivity : AppCompatActivity() {
                 webView.settings.loadWithOverviewMode = false
             }
             webView.settings.textZoom = textZoom
+
+            // Apply Data Saver (Block Images)
+            // blockNetworkImage = true prevents downloads
+            // loadsImagesAutomatically = false prevents display (but might download)
+            if (dataSaver) {
+                webView.settings.blockNetworkImage = true
+                webView.settings.loadsImagesAutomatically = false
+            } else {
+                webView.settings.blockNetworkImage = false
+                webView.settings.loadsImagesAutomatically = true
+            }
 
             // 3. Configure the script
             val configJs = "window.applyMiniMessengerConfig({ darkMode: $darkMode, hideClutter: $hideClutter });"

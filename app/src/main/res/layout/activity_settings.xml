@@ -44,6 +44,16 @@
         app:layout_constraintTop_toBottomOf="@id/switch_app_lock"
         app:layout_constraintStart_toStartOf="parent" />
 
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_data_saver"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Data Saver (Block Images)"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@id/switch_desktop_mode"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <TextView
         android:id="@+id/text_zoom_label"
         android:layout_width="wrap_content"
@@ -51,7 +61,7 @@
         android:text="Text Zoom"
         android:textSize="16sp"
         android:layout_marginTop="24dp"
-        app:layout_constraintTop_toBottomOf="@id/switch_desktop_mode"
+        app:layout_constraintTop_toBottomOf="@id/switch_data_saver"
         app:layout_constraintStart_toStartOf="parent" />
 
     <com.google.android.material.slider.Slider
